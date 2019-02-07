@@ -1,14 +1,35 @@
+#TARGET := default
+
 OUT = allocator
-CFLAGS += -m32
-LDFLAGS += ${CFLAGS}
-SRC := $(wildcard *.c)
+
+ifeq ($(TARGET), )
+	SRC := $(wildcard *.c)
+endif
+
+ifeq ($(TARGET), nrf52840)
+	SRC := $(wildcard s_heap*.c)
+endif
+
 OBJS := $(patsubst %.c,%.o,$(SRC))
+ARCH_FLAGS:=${CFLAGS} -I$(TOPDIR)/include
 
 all: $(OBJS)
-	gcc ${LDFLAGS} $(OBJS)  -o $(OUT)
+ifeq ($(TARGET), )
+	gcc -m32 $(OBJS)  -o $(OUT)
+endif
+
+ifeq ($(TARGET), nrf52840)
+	${PREFIX}ar -rc $(TOPDIR)/$(TMP_LIB) $(OBJS)
+endif
 
 %.o : %.c
-	gcc ${CFLAGS} -c $< -o $@
+ifeq ($(TARGET), )
+	gcc -m32 -c $< -o $@
+endif
+
+ifeq ($(TARGET), nrf52840)
+	${PREFIX}gcc $(ARCH_FLAGS) -c $< -o $@
+endif
 
 .PHONY: clean
 

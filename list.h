@@ -19,15 +19,25 @@
 #define _LINUX_LIST_H
 
 #include <stdio.h>
+
+/* NULL definition */
+
+#ifndef NULL
+#define NULL (0)
+#endif
+
 /**
  * @name from other kernel headers
  */
 /*@{*/
 
+#ifndef offsetof
+
 /**
  * Get offset of a member
  */
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#endif
 
 /**
  * Casts a member of a structure out to the containing structure
