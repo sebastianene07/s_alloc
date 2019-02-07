@@ -20,6 +20,7 @@
 #define __S_HEAP_H
 
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "list.h"
 
