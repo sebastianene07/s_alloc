@@ -62,7 +62,10 @@ int main(void)
 
     /* Set the i value */
 
-    memset(ptrs[i], i, sz);
+    for (int j = 0; j < sz; j++)
+    {
+      *((uint8_t *)ptrs[i] + j) = i;
+    }
 
     printf("Allocated block size %d addr 0x%x\n", sz, ptrs[i]);
   }
@@ -74,12 +77,13 @@ int main(void)
     {
       if (i != j)
       {
-        uint32_t *up_limit = ptrs[i] + size[i];
-        uint32_t *low_limit = ptrs[i];
+        uint8_t *up_limit = ((uint8_t *)ptrs[i]) + size[i];
+        uint8_t *low_limit = ptrs[i];
 
         if (low_limit <= ptrs[j] &&
-            up_limit <= ptrs[j])
+            up_limit >= ptrs[j])
         {
+          printf("(0x%x - 0x%x)\n", low_limit, up_limit);
           printf("Oh crap !!!\n Blocks 0x%x (size %u) and 0x%x (size %u)are"
                  " overlapping\n", ptrs[i], size[i], ptrs[j], size[j]);
           assert(false);
@@ -93,10 +97,10 @@ int main(void)
   {
     for (int j = 0; j < size[i]; ++j)
     {
-      if (ptrs[i][j] != i)
+      if (*((uint8_t *)ptrs[i] + j) != i)
       {
         printf("Memory corruption detected\n");
-        assert(ptrs[i][j] == i);
+        assert(*((uint8_t *)ptrs[i] + j) == i);
       }
     }
   }

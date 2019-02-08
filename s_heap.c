@@ -193,8 +193,8 @@ void *s_alloc(size_t len, heap_t *my_heap)
 
       size_t blocks = len / my_heap->block_size +
         ((len % my_heap->block_size) ? 1 : 0);
-      mem_node_t *free_node = node + blocks + 1;
 
+      mem_node_t *free_node = node + blocks + 1;
       if ((void *)free_node + 2 * my_heap->block_size > my_heap->heap_memory_end)
       {
         return NULL;
@@ -206,6 +206,8 @@ void *s_alloc(size_t len, heap_t *my_heap)
 
       list_del(&node->node_list);
       list_add(&node->node_list, &my_heap->g_used_heap_list);
+
+      assert(node->mask.size - blocks - 1 > 0);
 
       free_node->mask.used = 0;
       free_node->mask.size = node->mask.size - blocks - 1;
