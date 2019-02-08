@@ -15,7 +15,7 @@ ARCH_FLAGS:=${CFLAGS} -I$(TOPDIR)/include
 
 all: $(OBJS)
 ifeq ($(TARGET), )
-	gcc -m32 $(OBJS)  -o $(OUT)
+	gcc -m32 -g $(OBJS)  -o $(OUT)
 endif
 
 ifeq ($(TARGET), nrf52840)
@@ -24,7 +24,7 @@ endif
 
 %.o : %.c
 ifeq ($(TARGET), )
-	gcc -m32 -c $< -o $@
+	gcc -m32 -c -g $< -o $@
 endif
 
 ifeq ($(TARGET), nrf52840)

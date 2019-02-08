@@ -50,13 +50,55 @@ int main(void)
          block_size);
 
   uint32_t *ptrs[TEST_ARRAY_SIZE];
+  uint32_t size[TEST_ARRAY_SIZE];
+
   memset(&ptrs[0], 0, TEST_ARRAY_SIZE);
 
   for (int i = 0; i < TEST_ARRAY_SIZE; i++)
   {
     size_t sz = rand() % 10000;
+    size[i] = sz;
     ptrs[i] = s_alloc(sz, &my_heap);
+
+    /* Set the i value */
+
+    memset(ptrs[i], i, sz);
+
     printf("Allocated block size %d addr 0x%x\n", sz, ptrs[i]);
+  }
+
+  /* Verify if the blocks are overlapping */
+
+  for (int i = 0; i < TEST_ARRAY_SIZE; i++)
+    for (int j = 0; j < TEST_ARRAY_SIZE; j++)
+    {
+      if (i != j)
+      {
+        uint32_t *up_limit = ptrs[i] + size[i];
+        uint32_t *low_limit = ptrs[i];
+
+        if (low_limit <= ptrs[j] &&
+            up_limit <= ptrs[j])
+        {
+          printf("Oh crap !!!\n Blocks 0x%x (size %u) and 0x%x (size %u)are"
+                 " overlapping\n", ptrs[i], size[i], ptrs[j], size[j]);
+          assert(false);
+        }
+      }
+    }
+
+  /* verify if we have the correct contents */
+
+  for (int i = 0; i < TEST_ARRAY_SIZE; i++)
+  {
+    for (int j = 0; j < size[i]; ++j)
+    {
+      if (ptrs[i][j] != i)
+      {
+        printf("Memory corruption detected\n");
+        assert(ptrs[i][j] == i);
+      }
+    }
   }
 
   for (int i = 0; i < TEST_ARRAY_SIZE; i++)
