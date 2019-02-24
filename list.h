@@ -19,6 +19,7 @@
 #define _LINUX_LIST_H
 
 #include <stdio.h>
+#include <stdlib.h>
 
 /* NULL definition */
 
