@@ -279,7 +279,7 @@ void s_free(void *ptr, heap_t *my_heap)
 
     if (node->chunk_addr == ptr)
       {
-        /* We can't have an allocated block in this list */
+        /* We can't have a free block in this list */
 
         assert(node->mask.used == 1);
         node->mask.used = 0;
@@ -333,4 +333,68 @@ void s_free(void *ptr, heap_t *my_heap)
       }
 
   } while(merge_blocks);
+}
+
+/**
+ * s_realloc() - Re-allocate a memory block with a new specified size.
+ *
+ * @ptr: Previously allocated buffer with s_alloc or NULL in case this is a new
+ *       allocation.
+ * @size: The size of the new alocation or 0 if we want to free ptr memory.
+ * @my_heap: The specified heap where the buffer lives in.
+ *
+ * Resize a block of memory. In case the block does not exist in the
+ * used blocks list we assert.
+ *
+ * Return: None.
+ *
+ */
+void *s_realloc(void *ptr, size_t size, heap_t *my_heap)
+{
+  if (ptr == NULL)
+  {
+    return s_alloc(size, my_heap);
+  }
+
+  if (size == 0)
+  {
+    s_free(ptr, my_heap);
+    return NULL;
+  }
+
+  mem_node_t *node = NULL;
+  bool found_block = false;
+  list_for_each_entry (node, &my_heap->g_used_heap_list, node_list)
+  {
+
+    if (node->chunk_addr == ptr)
+      {
+        /* We can't have a free block in this list */
+
+        assert(node->mask.used == 1);
+        node->mask.used = 0;
+
+        found_block = true;
+        break;
+      }
+  }
+
+  /* The specified input address for this function is invalid.
+   * Did we encounter a double free memory corruption ?
+   */
+
+  assert(found_block == true);
+
+  uint8_t *new_buffer = s_alloc(size, my_heap);
+  if (new_buffer == NULL)
+  {
+    /* Free should be done by caller */
+    return NULL;
+  }
+
+  size_t min_copy_size = size > node->mask.size ? node->mask.size :
+    size;
+  memcpy(new_buffer, ptr, min_copy_size);
+  s_free(ptr, my_heap);
+  return new_buffer;
 }
