@@ -48,6 +48,34 @@ static size_t list_size(struct list_head *list)
 }
 
 /**
+ * size_comparator() - Address comparator.
+ *
+ * @node_1: The first node's address.
+ * @node_2: The second's node address.
+ *
+ * This utility function is used by allocator function to select the node
+ * that occupies less blocks
+ *
+ * Return: -1 in case the second node's address is greater or equal to the firs
+ * node's address otherwise 1.
+ *
+ */
+static int size_comparator(struct list_head *node_1, struct list_head *node_2)
+{
+  mem_node_t *mem_node_1 = list_entry(node_1, mem_node_t, node_list);
+  mem_node_t *mem_node_2 = list_entry(node_2, mem_node_t, node_list);
+
+  if (mem_node_1->mask.size <= mem_node_2->mask.size)
+  {
+    return -1;
+  }
+  else
+  {
+    return 1;
+  }
+}
+
+/**
  * list_sort - Sort the list with comparator function as argument.
  *
  * @list: the linked list to sort.
@@ -167,8 +195,6 @@ void s_init(heap_t *my_heap,
   list_add(&start_node->node_list, &my_heap->g_free_heap_list);
 }
 
-#define DEBUG_ONLY
-
 /**
  * s_alloc() - Allocate a memory chunk in a specified heap.
  *
@@ -202,6 +228,8 @@ void *s_alloc(size_t len, heap_t *my_heap)
     }
   }
 #endif
+
+  list_sort(&my_heap->g_free_heap_list, size_comparator);
 
   list_for_each_entry (node , &my_heap->g_free_heap_list, node_list)
   {
@@ -330,22 +358,16 @@ void s_free(void *ptr, heap_t *my_heap)
 
   /* Do we have continious free memory blocks ? If we have, merge them */
 
-  int jx = 0;
   bool merge_blocks;
   list_sort(&my_heap->g_free_heap_list, addr_comparator);
 
   do {
 
       merge_blocks = false;
-      jx++;
 
       list_for_each_entry (node, &my_heap->g_free_heap_list, node_list)
       {
         struct list_head *next_node = node->node_list.next;
-        if (next_node == &my_heap->g_free_heap_list)
-        {
-          break;
-        }
 
         mem_node_t *next_mem_node = list_entry(next_node, mem_node_t, node_list);
 
