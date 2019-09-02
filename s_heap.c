@@ -167,6 +167,8 @@ void s_init(heap_t *my_heap,
   list_add(&start_node->node_list, &my_heap->g_free_heap_list);
 }
 
+#define DEBUG_ONLY
+
 /**
  * s_alloc() - Allocate a memory chunk in a specified heap.
  *
@@ -185,14 +187,47 @@ void *s_alloc(size_t len, heap_t *my_heap)
   /* Start by looking in the list and search for an empty block with size >= len */
 
   mem_node_t *node = NULL;
+#ifdef DEBUG_ONLY
+
   list_for_each_entry (node , &my_heap->g_free_heap_list, node_list)
   {
-    if (node->mask.size * my_heap->block_size >= len)
+
+    assert(node->mask.used == 0);
+
+    mem_node_t *node_used = NULL;
+    list_for_each_entry (node_used , &my_heap->g_used_heap_list, node_list)
+    {
+      assert(node_used->mask.used == 1);
+      assert(node->chunk_addr != node_used->chunk_addr);
+    }
+  }
+#endif
+
+  list_for_each_entry (node , &my_heap->g_free_heap_list, node_list)
+  {
+    if ((node->mask.size > 0) &&
+        (node->mask.size - 1) * my_heap->block_size >= len)
     {
       /* Compute the address and verify if we are out of bounds */
 
       size_t blocks = len / my_heap->block_size +
         ((len % my_heap->block_size) ? 1 : 0);
+
+      /* Remove the node from the free list */
+
+      assert(node->mask.used == 0);
+      node->mask.used = 1;
+
+      list_del(&node->node_list);
+      list_add(&node->node_list, &my_heap->g_used_heap_list);
+
+      assert(node->mask.size - blocks - 1 >= 0);
+      int prev_size = node->mask.size;
+      node->mask.size = blocks;
+
+      /* Verify if we have free space after this allocated block. */
+
+      /* next_used_node can be == node */
 
       mem_node_t *free_node = node + blocks + 1;
       if ((void *)free_node + 2 * my_heap->block_size > my_heap->heap_memory_end)
@@ -200,22 +235,17 @@ void *s_alloc(size_t len, heap_t *my_heap)
         return NULL;
       }
 
-      /* Remove the node from the free list */
+      int new_free_node_size = prev_size - blocks - 1;
+      if (new_free_node_size <= 0)
+      {
+        return node->chunk_addr;
+      }
 
-      node->mask.used = 1;
-
-      list_del(&node->node_list);
-      list_add(&node->node_list, &my_heap->g_used_heap_list);
-
-      assert(node->mask.size - blocks - 1 > 0);
-
+      free_node->mask.size = new_free_node_size;
       free_node->mask.used = 0;
-      free_node->mask.size = node->mask.size - blocks - 1;
       free_node->chunk_addr = free_node + 1;
-
-      node->mask.size = blocks;
-
       list_add(&free_node->node_list, &my_heap->g_free_heap_list);
+
       return node->chunk_addr;
     }
   }
@@ -327,6 +357,8 @@ void s_free(void *ptr, heap_t *my_heap)
 
           /* The next block is my neighbour. Merge with him */
 
+          assert(node->mask.used == 0);
+
           node->mask.size += next_mem_node->mask.size + 1;
           list_del(next_node);
         }
@@ -372,7 +404,6 @@ void *s_realloc(void *ptr, size_t size, heap_t *my_heap)
         /* We can't have a free block in this list */
 
         assert(node->mask.used == 1);
-        node->mask.used = 0;
 
         found_block = true;
         break;
@@ -392,7 +423,10 @@ void *s_realloc(void *ptr, size_t size, heap_t *my_heap)
     return NULL;
   }
 
-  size_t min_copy_size = size > node->mask.size ? node->mask.size :
+  /* If we shrink space we need to copy at least these bytes */
+
+  size_t alloc_size = node->mask.size * my_heap->block_size;
+  size_t min_copy_size = size > alloc_size ? alloc_size :
     size;
   memcpy(new_buffer, ptr, min_copy_size);
   s_free(ptr, my_heap);

@@ -54,11 +54,19 @@ int main(void)
 
   memset(&ptrs[0], 0, TEST_ARRAY_SIZE);
 
+  s_dbg_heap(&my_heap);
+
   for (int i = 0; i < TEST_ARRAY_SIZE; i++)
   {
-    size_t sz = rand() % 10000;
+    size_t sz = rand() % 100;
     size[i] = sz;
     ptrs[i] = s_alloc(sz, &my_heap);
+    if (ptrs[i] == NULL)
+    {
+      size[i] = 0;
+      printf("No more space found for %d bytes return NULL!\n", sz);
+      continue;
+    }
 
     /* Set the i value */
 
@@ -67,7 +75,25 @@ int main(void)
       *((uint8_t *)ptrs[i] + j) = i;
     }
 
-    printf("Allocated block size %d addr 0x%x\n", sz, ptrs[i]);
+    printf("Allocated block size %d addr 0x%x fill_with:%x \n", sz, ptrs[i], i);
+
+    /* Try realloc if the sz value is modulo 2 */
+
+    if (sz % 2 == 0)
+    {
+      size_t new_size = rand() % 100;
+      size[i] = new_size;
+      ptrs[i] = s_realloc(ptrs[i], new_size, &my_heap);
+
+      /* Set the i value */
+
+      for (int j = sz; j < new_size; j++)
+      {
+        *((uint8_t *)ptrs[i] + j) = i;
+      }
+
+      printf("Re-allocated block size %d addr 0x%x fill with:%x\n", new_size, ptrs[i], i);
+    }
   }
 
   /* Verify if the blocks are overlapping */
@@ -95,6 +121,12 @@ int main(void)
 
   for (int i = 0; i < TEST_ARRAY_SIZE; i++)
   {
+    if (ptrs[i] == NULL)
+    {
+      printf("%i is NULL address !\n");
+      continue;
+    }
+
     for (int j = 0; j < size[i]; ++j)
     {
       if (*((uint8_t *)ptrs[i] + j) != i)
