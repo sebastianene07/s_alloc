@@ -368,21 +368,39 @@ void s_free(void *ptr, heap_t *my_heap)
       list_for_each_entry (node, &my_heap->g_free_heap_list, node_list)
       {
         struct list_head *next_node = node->node_list.next;
+        mem_node_t *next_free_node = list_entry(next_node, mem_node_t, node_list);
 
-        mem_node_t *next_mem_node = list_entry(next_node, mem_node_t, node_list);
-
-        /* Check if blocks are adjacent in memory */
-
-        if ((mem_node_t *)node->chunk_addr + node->mask.size == next_mem_node)
+        for (int offset = 0; offset < 2; offset++)
         {
-          merge_blocks = true;
+          mem_node_t *next_possible_node = (mem_node_t *)node->chunk_addr + node->mask.size + offset;
+          if (next_possible_node->chunk_addr == ((void *)next_possible_node + sizeof(mem_node_t)))
+          {
+            /* We almost sure have a new node !!! or we may be totally wrong */
 
-          /* The next block is my neighbour. Merge with him */
+            /* Verify if the size makes sense */
 
-          assert(node->mask.used == 0);
+            if (next_possible_node->mask.used == 1 ||
+                next_possible_node->mask.size == 0 ||
+                next_possible_node->mask.size > 0xFFFF)
+            {
+              continue;
+            }
 
-          node->mask.size += next_mem_node->mask.size + 1;
-          list_del(next_node);
+            /* Check if blocks are adjacent in memory */
+
+            if (next_possible_node == next_free_node)
+            {
+              merge_blocks = true;
+
+              /* The next block is my neighbour. Merge with him */
+
+              assert(node->mask.used == 0);
+
+              node->mask.size += next_free_node->mask.size + 1;
+              list_del(next_node);
+              break;
+            }
+          }
         }
       }
 

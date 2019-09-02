@@ -39,7 +39,7 @@ int main(void)
   static heap_t my_heap = {0};
   const size_t sz = 1024 * 1024;
   const size_t block_size = 16;
-  const uint32_t TEST_ARRAY_SIZE = 100;
+  const uint32_t TEST_ARRAY_SIZE = 200;
 
   void *start_addr = malloc(sz);
   assert(start_addr);
@@ -55,6 +55,9 @@ int main(void)
   memset(&ptrs[0], 0, TEST_ARRAY_SIZE);
 
   s_dbg_heap(&my_heap);
+
+  while (1)
+{
 
   for (int i = 0; i < TEST_ARRAY_SIZE; i++)
   {
@@ -84,6 +87,12 @@ int main(void)
       size_t new_size = rand() % 100;
       size[i] = new_size;
       ptrs[i] = s_realloc(ptrs[i], new_size, &my_heap);
+			if (ptrs[i] == NULL)
+			{
+				size[i] = 0;
+				printf("No more space found for %d bytes return NULL!\n", sz);
+				continue;
+			}
 
       /* Set the i value */
 
@@ -106,6 +115,7 @@ int main(void)
         uint8_t *up_limit = ((uint8_t *)ptrs[i]) + size[i];
         uint8_t *low_limit = ptrs[i];
 
+        if (ptrs[j] == NULL) continue;
         if (low_limit <= ptrs[j] &&
             up_limit >= ptrs[j])
         {
@@ -143,7 +153,9 @@ int main(void)
   }
 
   s_dbg_heap(&my_heap);
-
+  sleep(5);
+  printf("\r\n##############\r\n");
+}
   free(start_addr);
   return 0;
 }
