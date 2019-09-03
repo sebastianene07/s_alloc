@@ -233,8 +233,8 @@ void *s_alloc(size_t len, heap_t *my_heap)
 
   list_for_each_entry (node , &my_heap->g_free_heap_list, node_list)
   {
-    if ((node->mask.size > 0) &&
-        (node->mask.size - 1) * my_heap->block_size >= len)
+    if ((node->mask.size > 1) &&
+        (node->mask.size - 2) * my_heap->block_size >= len)
     {
       /* Compute the address and verify if we are out of bounds */
 
@@ -258,16 +258,13 @@ void *s_alloc(size_t len, heap_t *my_heap)
       /* next_used_node can be == node */
 
       mem_node_t *free_node = node + blocks + 1;
-      if ((void *)free_node + 2 * my_heap->block_size > my_heap->heap_memory_end)
+      if ((void *)free_node + my_heap->block_size > my_heap->heap_memory_end)
       {
         return NULL;
       }
 
       int new_free_node_size = prev_size - blocks - 1;
-      if (new_free_node_size <= 0)
-      {
-        return node->chunk_addr;
-      }
+      assert(new_free_node_size > 0);
 
       free_node->mask.size = new_free_node_size;
       free_node->mask.used = 0;
