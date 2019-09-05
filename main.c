@@ -134,7 +134,7 @@ int main(void)
 		{
 			if (ptrs[i] == NULL)
 			{
-				printf("%i is NULL address !\n");
+				printf("%d is NULL address !\n", i);
 				continue;
 			}
 
