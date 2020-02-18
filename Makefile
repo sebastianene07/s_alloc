@@ -9,7 +9,7 @@ else
 endif
 
 OBJS := $(patsubst %.c,%.o,$(SRC))
-ARCH_FLAGS:=${CFLAGS} -I$(TOPDIR)/include
+ARCH_FLAGS:=${CFLAGS} -I$(TOPDIR)/include -I$(TOPDIR)/include/chip
 
 all: $(OBJS)
 ifeq ($(TARGET), )
@@ -21,7 +21,7 @@ endif
 %.o : %.c
 ifeq ($(TARGET), )
 	gcc -m32 -c -g $< -o $@
-else 
+else
 	${PREFIX}gcc $(ARCH_FLAGS) -c $< -o $@
 endif
 
