@@ -21,6 +21,9 @@
 #include <string.h>
 #include <assert.h>
 
+#define MAX_LIST_LENGTH_BITS 20
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
 #include "s_heap.h"
 
 /**
@@ -56,77 +59,154 @@ static size_t list_size(struct list_head *list)
  * This utility function is used by allocator function to select the node
  * that occupies less blocks
  *
- * Return: -1 in case the second node's address is greater or equal to the firs
- * node's address otherwise 1.
+ * Return: -1 if the 2nd node's size is greater than the 1st node's size
+ *          1 if the 1st node's size is greater than the 2nd node's size
+ *          0 otherwise
  *
  */
-static int size_comparator(struct list_head *node_1, struct list_head *node_2)
+static int size_comparator(void *priv,
+                           struct list_head *node_1,
+                           struct list_head *node_2)
 {
   mem_node_t *mem_node_1 = list_entry(node_1, mem_node_t, node_list);
   mem_node_t *mem_node_2 = list_entry(node_2, mem_node_t, node_list);
 
-  if (mem_node_1->mask.size <= mem_node_2->mask.size)
-  {
-    return -1;
+ return (mem_node_1->mask.size > mem_node_2->mask.size) -
+        (mem_node_1->mask.size < mem_node_2->mask.size);
+}
+
+/*
+ * Returns a list organized in an intermediate format suited
+ * to chaining of merge() calls: null-terminated, no reserved or
+ * sentinel head node, "prev" links not maintained.
+ */
+static struct list_head *merge(void *priv,
+                               int (*cmp)(void *priv, struct list_head *a,
+                               struct list_head *b),
+                               struct list_head *a, struct list_head *b)
+{
+  struct list_head head, *tail = &head;
+
+  while (a && b) {
+    /* if equal, take 'a' -- important for sort stability */
+    if ((*cmp)(priv, a, b) <= 0) {
+      tail->next = a;
+      a = a->next;
+    } else {
+      tail->next = b;
+      b = b->next;
+    }
+    tail = tail->next;
   }
-  else
-  {
-    return 1;
+  tail->next = a?:b;
+  return head.next;
+}
+
+/*
+ * Combine final list merge with restoration of standard doubly-linked
+ * list structure.  This approach duplicates code from merge(), but
+ * runs faster than the tidier alternatives of either a separate final
+ * prev-link restoration pass, or maintaining the prev links
+ * throughout.
+ */
+static void merge_and_restore_back_links(void *priv,
+                                         int (*cmp)(void *priv, struct list_head *a,
+                                         struct list_head *b),
+                                         struct list_head *head,
+                                         struct list_head *a, struct list_head *b)
+{
+  struct list_head *tail = head;
+  uint8_t count = 0;
+
+  while (a && b) {
+    /* if equal, take 'a' -- important for sort stability */
+    if ((*cmp)(priv, a, b) <= 0) {
+      tail->next = a;
+      a->prev = tail;
+      a = a->next;
+    } else {
+      tail->next = b;
+      b->prev = tail;
+      b = b->next;
+    }
+    tail = tail->next;
   }
+  tail->next = a ? : b;
+
+  do {
+    /*
+     * In worst cases this loop may run many iterations.
+     * Continue callbacks to the client even though no
+     * element comparison is needed, so the client's cmp()
+     * routine can invoke cond_resched() periodically.
+     */
+    if (!(++count))
+      (*cmp)(priv, tail->next, tail->next);
+
+    tail->next->prev = tail;
+    tail = tail->next;
+  } while (tail->next);
+
+  tail->next = head;
+  head->prev = tail;
 }
 
 /**
- * list_sort - Sort the list with comparator function as argument.
+ * list_sort - sort a list
+ * @priv: private data, opaque to list_sort(), passed to @cmp
+ * @head: the list to sort
+ * @cmp: the elements comparison function
  *
- * @list: the linked list to sort.
- * @cmp: callback function for comparator.
+ * This function implements "merge sort", which has O(nlog(n))
+ * complexity.
  *
- * This is an O(N^2) sorting implementation on a Linux style double linked list
+ * The comparison function @cmp must return a negative value if @a
+ * should sort before @b, and a positive value if @a should sort after
+ * @b. If @a and @b are equivalent, and their original relative
+ * ordering is to be preserved, @cmp must return 0.
  */
-static void list_sort(struct list_head *list,
-                      comparator_cb cmp)
+void list_sort(void *priv, struct list_head *head,
+               int (*cmp)(void *priv, struct list_head *a,
+               struct list_head *b))
 {
-  struct list_head *node_1 = NULL;
-  struct list_head *node_2 = NULL;
-  bool ok = true;
+  struct list_head *part[MAX_LIST_LENGTH_BITS+1]; /* sorted partial lists
+            -- last slot is a sentinel */
+  int lev;  /* index into part[] */
+  int max_lev = 0;
+  struct list_head *list;
 
-  if (list_size(list) == 1)
-  {
+  if (list_empty(head))
     return;
-  }
 
-  while (ok)
-  {
-    ok = false;
-    list_for_each_stop(node_1, list->prev, list)
-    {
-      node_2 = node_1->next;
+  memset(part, 0, sizeof(part));
 
-      if (cmp(node_1, node_2) > 0)
-      {
-        struct list_head *tmp1_prev;
-        tmp1_prev = node_1->prev;
-        tmp1_prev->next = node_2;
+  head->prev->next = NULL;
+  list = head->next;
 
-        struct list_head *tmp2_next;
-        tmp2_next = node_2->next;
-        tmp2_next->prev = node_1;
+  while (list) {
+    struct list_head *cur = list;
+    list = list->next;
+    cur->next = NULL;
 
-        node_1->prev = node_2;
-        node_1->next = tmp2_next;
-
-        node_2->prev = tmp1_prev;
-        node_2->next = node_1;
-
-        ok = true;
-
-        if (node_1 == list->prev)
-        {
-          return;
-        }
-      }
+    for (lev = 0; part[lev]; lev++) {
+      cur = merge(priv, cmp, part[lev], cur);
+      part[lev] = NULL;
     }
+    if (lev > max_lev) {
+      if (lev >= ARRAY_SIZE(part)-1) {
+        /* list too long for efficiency\n */
+        lev--;
+      }
+      max_lev = lev;
+    }
+    part[lev] = cur;
   }
+
+  for (lev = 0; lev < max_lev; lev++)
+    if (part[lev])
+      list = merge(priv, cmp, part[lev], list);
+
+  merge_and_restore_back_links(priv, cmp, head, part[max_lev], list);
 }
 
 /**
@@ -229,7 +309,7 @@ void *s_alloc(size_t len, heap_t *my_heap)
   }
 #endif
 
-  list_sort(&my_heap->g_free_heap_list, size_comparator);
+  list_sort(NULL, &my_heap->g_free_heap_list, size_comparator);
 
   list_for_each_entry (node , &my_heap->g_free_heap_list, node_list)
   {
@@ -287,23 +367,21 @@ void *s_alloc(size_t len, heap_t *my_heap)
  * This utility function is used by the sorting algoritm to compare the address
  * of two memory nodes.
  *
- * Return: -1 in case the second node's address is greater or equal to the firs
- * node's address otherwise 1.
+ * Return: -1 if the 2nd node's address is greater than the 1st node's address
+ *          1 if the 1st node's address is greater than the 2nd node's address
+ *          0 otherwise
+
  *
  */
-static int addr_comparator(struct list_head *node_1, struct list_head *node_2)
+static int addr_comparator(void *priv,
+                           struct list_head *node_1,
+                           struct list_head *node_2)
 {
   mem_node_t *mem_node_1 = list_entry(node_1, mem_node_t, node_list);
   mem_node_t *mem_node_2 = list_entry(node_2, mem_node_t, node_list);
 
-  if (mem_node_1->chunk_addr <= mem_node_2->chunk_addr)
-  {
-    return -1;
-  }
-  else
-  {
-    return 1;
-  }
+  return (mem_node_1->chunk_addr > mem_node_2->chunk_addr) -
+         (mem_node_1->chunk_addr < mem_node_2->chunk_addr);
 }
 
 /**
@@ -356,7 +434,7 @@ void s_free(void *ptr, heap_t *my_heap)
   /* Do we have continious free memory blocks ? If we have, merge them */
 
   bool merge_blocks;
-  list_sort(&my_heap->g_free_heap_list, addr_comparator);
+  list_sort(NULL, &my_heap->g_free_heap_list, addr_comparator);
 
   do {
 
