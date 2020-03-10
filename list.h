@@ -74,8 +74,6 @@ struct list_head {
   struct list_head *next, *prev;
 };
 
-int (*comparator)(struct list_head *node_1, struct list_head *node_2);
-
 typedef int (*comparator_cb)(struct list_head *node_1, struct list_head *node_2);
 
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
