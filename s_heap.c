@@ -248,13 +248,13 @@ void s_init(heap_t *my_heap,
 
   /* Align heap_mem_start to HEAP_BLOCK_SIZE */
 
-  my_heap->heap_mem_start = (void *)(((uint32_t)start_heap_unaligned) +
-    ((uint32_t)start_heap_unaligned) % block_size);
+  my_heap->heap_mem_start = (void *)(((uint64_t)start_heap_unaligned) +
+    ((uint64_t)start_heap_unaligned) % block_size);
 
   /* Count the number of blocks */
 
   my_heap->num_blocks =
-    ((uint32_t)end_heap - (uint32_t)my_heap->heap_mem_start) / block_size;
+    ((uint64_t)end_heap - (uint64_t)my_heap->heap_mem_start) / block_size;
 
   memset(my_heap->heap_mem_start, 0, my_heap->num_blocks * block_size);
 
