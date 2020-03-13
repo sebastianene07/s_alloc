@@ -27,30 +27,6 @@
 #include "s_heap.h"
 
 /**
- * list_size - Get the size of the linked list.
- *
- * @list: The linked list.
- *
- * Return: The size of the linked list or 0.
- */
-static size_t list_size(struct list_head *list)
-{
-  if (list == NULL)
-  {
-    return 0;
-  }
-
-  int i = 0;
-  mem_node_t *node = NULL;
-  list_for_each_entry (node, list, node_list)
-  {
-    i++;
-  }
-
-  return i;
-}
-
-/**
  * size_comparator() - Address comparator.
  *
  * @node_1: The first node's address.
