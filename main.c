@@ -46,8 +46,7 @@ int main(void)
 
   s_init(&my_heap,
          start_addr,
-         start_addr + sz,
-         block_size);
+         start_addr + sz);
 
   uint32_t *ptrs[TEST_ARRAY_SIZE];
   uint32_t size[TEST_ARRAY_SIZE];

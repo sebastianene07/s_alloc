@@ -80,8 +80,7 @@ typedef struct {
  */
 void s_init(heap_t *my_heap,
             void *start_heap_unaligned,
-            void *end_heap,
-            size_t block_size);
+            void *end_heap);
 
 /**
  * s_alloc() - Allocate a memory chunk in a specified heap.

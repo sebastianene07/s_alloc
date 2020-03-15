@@ -199,10 +199,9 @@ void list_sort(void *priv, struct list_head *head,
  */
 void s_init(heap_t *my_heap,
             void *start_heap_unaligned,
-            void *end_heap,
-            size_t block_size)
+            void *end_heap)
 {
-  assert(block_size == sizeof(mem_node_t));
+  size_t block_size = sizeof(mem_node_t);
   assert(end_heap > start_heap_unaligned);
 
   if (my_heap == NULL ||
