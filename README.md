@@ -23,11 +23,5 @@ You can easily create a wrapper on top of ``` s_alloc () ``` and
 ``` s_free () ``` that will select which heap bucket to use based on the
 requested memory chunk size.
 
-## TODO
-
-- fix bug when block_size != 16 bytes
-- implement realloc
-- improve block sorting algorithm
-- improve merging free blocks algorithm
 
 Signed-off-by: Sebastian Ene <sebastian.ene07@gmail.com>
