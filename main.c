@@ -3,23 +3,24 @@
 #include <stdbool.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "s_heap.h"
 
 void s_dbg_heap(heap_t *my_heap)
 {
   printf("\n################ Heap details ####################\n");
-  printf("Start addr: 0x%x\n", my_heap->heap_mem_start);
-  printf("End addr: 0x%x\n", my_heap->heap_memory_end);
-  printf("block size: %u\n", my_heap->block_size);
+  printf("Start addr: 0x%lx\n", (unsigned long)my_heap->heap_mem_start);
+  printf("End addr: 0x%lx\n", (unsigned long)my_heap->heap_memory_end);
+  printf("block size: %zu\n", my_heap->block_size);
 
   printf("################ Alocated blocks ##################\n");
 
   mem_node_t *node = NULL;
   list_for_each_entry (node, &my_heap->g_used_heap_list, node_list)
   {
-    printf("leaked block start = 0x%x, size = %u blocks\n",
-           node->chunk_addr,
+    printf("leaked block start = 0x%lx, size = %u blocks\n",
+           (unsigned long)node->chunk_addr,
            node->mask.size);
   }
 
@@ -28,17 +29,16 @@ void s_dbg_heap(heap_t *my_heap)
   node = NULL;
   list_for_each_entry (node, &my_heap->g_free_heap_list, node_list)
   {
-    printf("block start = 0x%x, size = %u blocks\n",
-           node->chunk_addr,
+    printf("block start = 0x%lx, size = %u blocks\n",
+           (unsigned long)node->chunk_addr,
            node->mask.size);
   }
 }
 
 int main(void)
 {
-  static heap_t my_heap = {0};
+  static heap_t my_heap;
   const size_t sz = 1024 * 1024;
-  const size_t block_size = 16;
   const uint32_t TEST_ARRAY_SIZE = 200;
 
   void *start_addr = malloc(sz);
@@ -67,7 +67,7 @@ int main(void)
 			if (ptrs[i] == NULL)
 			{
 				size[i] = 0;
-				printf("No more space found for %d bytes return NULL!\n", sz);
+				printf("No more space found for %zu bytes return NULL!\n", sz);
 				continue;
 			}
 
@@ -78,7 +78,9 @@ int main(void)
 				*((uint8_t *)ptrs[i] + j) = i;
 			}
 
-			printf("Allocated block size %d addr 0x%x fill_with:%x \n", sz, ptrs[i], i);
+			printf("Allocated block size %zu addr 0x%lx fill_with:%x \n", sz,
+             (unsigned long)ptrs[i],
+             i);
 
 			/* Try realloc if the sz value is modulo 2 */
 
@@ -90,7 +92,7 @@ int main(void)
 				if (ptrs[i] == NULL)
 				{
 					size[i] = 0;
-					printf("No more space found for %d bytes return NULL!\n", sz);
+					printf("No more space found for %zu bytes return NULL!\n", sz);
 					continue;
 				}
 
@@ -101,7 +103,8 @@ int main(void)
 					*((uint8_t *)ptrs[i] + j) = i;
 				}
 
-				printf("Re-allocated block size %d addr 0x%x fill with:%x\n", new_size, ptrs[i], i);
+				printf("Re-allocated block size %zu addr 0x%lx fill with:%x\n",
+               new_size, (unsigned long)ptrs[i], i);
 			}
 		}
 
@@ -113,15 +116,16 @@ int main(void)
 				if (i != j)
 				{
 					uint8_t *up_limit = ((uint8_t *)ptrs[i]) + size[i];
-					uint8_t *low_limit = ptrs[i];
+					uint8_t *low_limit = (uint8_t *)ptrs[i];
 
 					if (ptrs[j] == NULL) continue;
-					if (low_limit <= ptrs[j] &&
-							up_limit >= ptrs[j])
+					if (low_limit <= (uint8_t *)ptrs[j] &&
+							up_limit >= (uint8_t *)ptrs[j])
 					{
-						printf("(0x%x - 0x%x)\n", low_limit, up_limit);
-						printf("Oh crap !!!\n Blocks 0x%x (size %u) and 0x%x (size %u)are"
-									 " overlapping\n", ptrs[i], size[i], ptrs[j], size[j]);
+						printf("(0x%lx - 0x%lx)\n", (unsigned long)low_limit, (unsigned long)up_limit);
+						printf("Oh crap !!!\n Blocks 0x%lx (size %u) and 0x%lx (size %u)are"
+									 " overlapping\n", (unsigned long)ptrs[i], size[i],
+                   (unsigned long)ptrs[j], size[j]);
 						assert(false);
 					}
 				}

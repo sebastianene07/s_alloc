@@ -1,31 +1,22 @@
-#TARGET := default
-
 OUT = allocator
-
-ifeq ($(TARGET), )
-	SRC := $(wildcard *.c)
-else
-	SRC := $(wildcard s_heap*.c)
-endif
-
+LIBRARY_CFLAGS := $(CFLAGS) -Wall -Werror 
+TOPDIR ?= .
+TMP_LIB ?= lib_salloc.a 
+LIBRARY := $(TOPDIR)/$(TMP_LIB)
+SRC := s_heap.c 
+TEST_SRC := main.c
 OBJS := $(patsubst %.c,%.o,$(SRC))
-ARCH_FLAGS:=${CFLAGS} -I$(TOPDIR)/include -I$(TOPDIR)/include/chip
 
 all: $(OBJS)
-ifeq ($(TARGET), )
-	gcc -m32 -g $(OBJS)  -o $(OUT)
-else
-	${PREFIX}ar -rc $(TOPDIR)/$(TMP_LIB) $(OBJS)
-endif
+	$(PREFIX)ar -rc $(LIBRARY) $(OBJS)
+
+test:
+	$(PREFIX)gcc $(LIBRARY_CFLAGS) $(LIBRARY) $(TEST_SRC) -o $(OUT)
 
 %.o : %.c
-ifeq ($(TARGET), )
-	gcc -m32 -c -g $< -o $@
-else
-	${PREFIX}gcc $(ARCH_FLAGS) -c $< -o $@
-endif
+	$(PREFIX)gcc $(LIBRARY_CFLAGS) -c $< -o $@
 
 .PHONY: clean
 
 clean:
-	rm -f $(OUT) *.o
+	rm -f $(OUT) *.o $(LIBRARY)
