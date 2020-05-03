@@ -1,4 +1,4 @@
-# S Alloc
+# Simple Allocator
 
 Simple memory allocator using Linux linked list implementation.
 
@@ -52,26 +52,38 @@ block start = 0x7f8830000020, size = 32767 blocks
 
 The library has the following API :
 
-``` s_init /* Initialize the library by specifing the start of the heap
-            * address and the end address. Specify a heap structure as
-            * an input. This will be used as a container to store specific
-            * data for the heap.
-            */
+``` 
+s_init
+
+/* Initialize the library by specifing the start of the heap
+ * address and the end address. Specify a heap structure as
+ * an input. This will be used as a container to store specific
+ * data for the heap.
+ */
 ```
 
-``` s_alloc /* As the name suggests this allocates a chunk of memory in a 
-             * specified heap. Returns NULL on failure.
+``` 
+s_alloc 
+
+/* As the name suggests this allocates a chunk of memory in a 
+ * specified heap. Returns NULL on failure.
 ```
 
-``` s_realloc /* Re-allocate a heap region in a new chunk. This operation is
-               * costly because it involves data copy if we want to strecth
-               * an existing chunk. Moreover it has to re-order the block
-               * that was freed
+```
+s_realloc 
+
+/* Re-allocate a heap region in a new chunk. This operation is
+ * costly because it involves data copy if we want to strecth
+ * an existing chunk. Moreover it has to re-order the block
+ * that was freed.
 ```
 
-``` s_free /* Eliberate a previously allocated block of memory from a specified
-            * heap and merge the free blocks in the free list if they are 
-            * adjacent
+``` 
+s_free 
+
+/* Eliberate a previously allocated block of memory from a specified
+ * heap and merge the free blocks in the free list if they are 
+ * adjacent.
 ```
 
 How can we face fragmentation issues ?
