@@ -70,6 +70,7 @@ typedef struct {
 /**
  * s_init() - Initialize heap memory.
  *
+ * @my_heap : The heap context used to store heap info.
  * @start_heap_unaligned: The start of the unaligned memory region for HEAP.
  * @end_heap: The end of the HEAP region.
  *
@@ -87,6 +88,7 @@ void s_init(heap_t *my_heap,
  *
  * @len: The requested memory size.
  * @my_heap: The pool of memory from where we allocate.
+ * @my_heap: The heap context where we allocate memory.
  *
  * This function reserves a continious block of memory.
  *
