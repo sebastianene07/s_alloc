@@ -202,6 +202,7 @@ void s_init(heap_t *my_heap,
             void *end_heap)
 {
   size_t block_size = sizeof(mem_node_t);
+  mem_node_t *start_node = NULL;
   assert(end_heap > start_heap_unaligned);
 
   if (my_heap == NULL ||
@@ -235,7 +236,7 @@ void s_init(heap_t *my_heap,
 
   /* Add the first node */
 
-  mem_node_t *start_node = (mem_node_t *)my_heap->heap_mem_start;
+  start_node = (mem_node_t *)my_heap->heap_mem_start;
   start_node->mask = (mem_mask_t) {
     .used = 0,
     .size = my_heap->num_blocks - 1,
