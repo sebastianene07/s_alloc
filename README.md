@@ -100,7 +100,8 @@ requested memory chunk size.
 Are there any limitations ?
 
 The largest size of an allocation should not be greater than :
-2 ^ 31 * BLOCK_SIZE where the BLOCK_SIZE is user defined.
+2 ^ 31 * BLOCK_SIZE where the BLOCK_SIZE is 32 so the largest chunk can
+be 2 ^ 36 bytes = 64Gb.
 Every chunk of memory has a header where we store the chunk size and this
 value can be adjusted by needs. Also the BLOCK_SIZE value can be adjusted
 but make sure that you use a value that doesn't waste space if your alocations
