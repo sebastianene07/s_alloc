@@ -51,140 +51,6 @@ static int size_comparator(void *priv,
         (mem_node_1->mask.size < mem_node_2->mask.size);
 }
 
-/*
- * Returns a list organized in an intermediate format suited
- * to chaining of merge() calls: null-terminated, no reserved or
- * sentinel head node, "prev" links not maintained.
- */
-static struct list_head *merge(void *priv,
-                               int (*cmp)(void *priv, struct list_head *a,
-                               struct list_head *b),
-                               struct list_head *a, struct list_head *b)
-{
-  struct list_head head, *tail = &head;
-
-  while (a && b) {
-    /* if equal, take 'a' -- important for sort stability */
-    if ((*cmp)(priv, a, b) <= 0) {
-      tail->next = a;
-      a = a->next;
-    } else {
-      tail->next = b;
-      b = b->next;
-    }
-    tail = tail->next;
-  }
-  tail->next = a?:b;
-  return head.next;
-}
-
-/*
- * Combine final list merge with restoration of standard doubly-linked
- * list structure.  This approach duplicates code from merge(), but
- * runs faster than the tidier alternatives of either a separate final
- * prev-link restoration pass, or maintaining the prev links
- * throughout.
- */
-static void merge_and_restore_back_links(void *priv,
-                                         int (*cmp)(void *priv, struct list_head *a,
-                                         struct list_head *b),
-                                         struct list_head *head,
-                                         struct list_head *a, struct list_head *b)
-{
-  struct list_head *tail = head;
-  uint8_t count = 0;
-
-  while (a && b) {
-    /* if equal, take 'a' -- important for sort stability */
-    if ((*cmp)(priv, a, b) <= 0) {
-      tail->next = a;
-      a->prev = tail;
-      a = a->next;
-    } else {
-      tail->next = b;
-      b->prev = tail;
-      b = b->next;
-    }
-    tail = tail->next;
-  }
-  tail->next = a ? : b;
-
-  do {
-    /*
-     * In worst cases this loop may run many iterations.
-     * Continue callbacks to the client even though no
-     * element comparison is needed, so the client's cmp()
-     * routine can invoke cond_resched() periodically.
-     */
-    if (!(++count))
-      (*cmp)(priv, tail->next, tail->next);
-
-    tail->next->prev = tail;
-    tail = tail->next;
-  } while (tail->next);
-
-  tail->next = head;
-  head->prev = tail;
-}
-
-/**
- * list_sort - sort a list
- * @priv: private data, opaque to list_sort(), passed to @cmp
- * @head: the list to sort
- * @cmp: the elements comparison function
- *
- * This function implements "merge sort", which has O(nlog(n))
- * complexity.
- *
- * The comparison function @cmp must return a negative value if @a
- * should sort before @b, and a positive value if @a should sort after
- * @b. If @a and @b are equivalent, and their original relative
- * ordering is to be preserved, @cmp must return 0.
- */
-void list_sort(void *priv, struct list_head *head,
-               int (*cmp)(void *priv, struct list_head *a,
-               struct list_head *b))
-{
-  struct list_head *part[MAX_LIST_LENGTH_BITS+1]; /* sorted partial lists
-            -- last slot is a sentinel */
-  int lev;  /* index into part[] */
-  int max_lev = 0;
-  struct list_head *list;
-
-  if (list_empty(head))
-    return;
-
-  memset(part, 0, sizeof(part));
-
-  head->prev->next = NULL;
-  list = head->next;
-
-  while (list) {
-    struct list_head *cur = list;
-    list = list->next;
-    cur->next = NULL;
-
-    for (lev = 0; part[lev]; lev++) {
-      cur = merge(priv, cmp, part[lev], cur);
-      part[lev] = NULL;
-    }
-    if (lev > max_lev) {
-      if (lev >= ARRAY_SIZE(part)-1) {
-        /* list too long for efficiency\n */
-        lev--;
-      }
-      max_lev = lev;
-    }
-    part[lev] = cur;
-  }
-
-  for (lev = 0; lev < max_lev; lev++)
-    if (part[lev])
-      list = merge(priv, cmp, part[lev], list);
-
-  merge_and_restore_back_links(priv, cmp, head, part[max_lev], list);
-}
-
 /**
  * s_init() - Initialize heap memory.
  *
@@ -203,11 +69,11 @@ void s_init(heap_t *my_heap,
 {
   size_t block_size = sizeof(mem_node_t);
   mem_node_t *start_node = NULL;
-  assert(end_heap > start_heap_unaligned);
 
   if (my_heap == NULL ||
       start_heap_unaligned == NULL ||
-      end_heap == NULL)
+      end_heap == NULL ||
+      end_heap < start_heap_unaligned)
     {
       assert(false);
       return;
@@ -215,8 +81,8 @@ void s_init(heap_t *my_heap,
 
   /* Save the block size */
 
-  my_heap->block_size = block_size;
-  my_heap->heap_memory_end = end_heap;
+  my_heap->block_size               = block_size;
+  my_heap->heap_memory_end          = end_heap;
   my_heap->heap_mem_start_unaligned = start_heap_unaligned;
 
   INIT_LIST_HEAD(&my_heap->g_free_heap_list);
@@ -269,33 +135,21 @@ void *s_alloc(size_t len, heap_t *my_heap)
   /* Start by looking in the list and search for an empty block with size >= len */
 
   mem_node_t *node = NULL;
-#ifdef DEBUG_ONLY
-
-  list_for_each_entry (node , &my_heap->g_free_heap_list, node_list)
-  {
-
-    assert(node->mask.used == 0);
-
-    mem_node_t *node_used = NULL;
-    list_for_each_entry (node_used , &my_heap->g_used_heap_list, node_list)
-    {
-      assert(node_used->mask.used == 1);
-      assert(node->chunk_addr != node_used->chunk_addr);
-    }
-  }
-#endif
 
   list_sort(NULL, &my_heap->g_free_heap_list, size_comparator);
 
   list_for_each_entry (node , &my_heap->g_free_heap_list, node_list)
   {
+    /* If the node is used (1) but is in this list assert */
+
+    assert(node->mask.used == 0);
+
     if ((node->mask.size > 1) &&
         (node->mask.size - 2) * my_heap->block_size >= len)
     {
       /* Compute the address and verify if we are out of bounds */
 
-      size_t blocks = len / my_heap->block_size +
-        ((len % my_heap->block_size) ? 1 : 0);
+      size_t blocks = len / my_heap->block_size + 1;
 
       /* Remove the node from the free list */
 
@@ -306,6 +160,7 @@ void *s_alloc(size_t len, heap_t *my_heap)
       list_add(&node->node_list, &my_heap->g_used_heap_list);
 
       assert(node->mask.size - blocks - 1 >= 0);
+
       int prev_size = node->mask.size;
       node->mask.size = blocks;
 
@@ -320,13 +175,13 @@ void *s_alloc(size_t len, heap_t *my_heap)
       }
 
       int new_free_node_size = prev_size - blocks - 1;
-      assert(new_free_node_size > 0);
-
-      free_node->mask.size = new_free_node_size;
-      free_node->mask.used = 0;
-      free_node->chunk_addr = free_node + 1;
-      list_add(&free_node->node_list, &my_heap->g_free_heap_list);
-
+      if (new_free_node_size > 0)
+      {
+        free_node->mask.size = new_free_node_size;
+        free_node->mask.used = 0;
+        free_node->chunk_addr = free_node + 1;
+        list_add(&free_node->node_list, &my_heap->g_free_heap_list);
+      }
       return node->chunk_addr;
     }
   }
@@ -385,12 +240,12 @@ void s_free(void *ptr, heap_t *my_heap)
   bool found_block = false;
   list_for_each_entry (node, &my_heap->g_used_heap_list, node_list)
   {
+    /* We can't have a free block in this list */
+
+    assert(node->mask.used == 1);
 
     if (node->chunk_addr == ptr)
       {
-        /* We can't have a free block in this list */
-
-        assert(node->mask.used == 1);
         node->mask.used = 0;
 
         list_del(&node->node_list);
@@ -419,7 +274,18 @@ void s_free(void *ptr, heap_t *my_heap)
       list_for_each_entry (node, &my_heap->g_free_heap_list, node_list)
       {
         struct list_head *next_node = node->node_list.next;
+        if (next_node == &my_heap->g_free_heap_list)
+        {
+          /* We reached end */
+
+          break;
+        }
+
         mem_node_t *next_free_node = list_entry(next_node, mem_node_t, node_list);
+
+        /* We can't have an used block in the free heap list */
+
+        assert(next_free_node->mask.used == 0);
 
         for (int offset = 0; offset < 2; offset++)
         {
@@ -489,13 +355,12 @@ void *s_realloc(void *ptr, size_t size, heap_t *my_heap)
   bool found_block = false;
   list_for_each_entry (node, &my_heap->g_used_heap_list, node_list)
   {
+    /* We can't have a free block in this list */
+
+    assert(node->mask.used == 1);
 
     if (node->chunk_addr == ptr)
       {
-        /* We can't have a free block in this list */
-
-        assert(node->mask.used == 1);
-
         found_block = true;
         break;
       }

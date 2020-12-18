@@ -12,8 +12,10 @@
  *     - all #include line
  *     - prefetch() and rcu related functions
  * 3. add macro offsetof() and container_of
+ * 4. added list_sort utility
  *
  * - kazutomo@mcs.anl.gov
+ * - sebastian.ene07@gmail.com
  */
 #ifndef _LINUX_LIST_H
 #define _LINUX_LIST_H
@@ -74,7 +76,11 @@ struct list_head {
   struct list_head *next, *prev;
 };
 
-typedef int (*comparator_cb)(struct list_head *node_1, struct list_head *node_2);
+/* The callback used to compare two list elements */
+
+typedef int (* comparator_cb)(void *priv,
+                              struct list_head *a,
+                              struct list_head *b);
 
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
 
@@ -537,5 +543,42 @@ static inline void hlist_add_after(struct hlist_node *n,
     ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
        pos = n)
 
+/**
+ * list_length - return the list length
+ *
+ * @head: the list to sort
+ *
+ * Return the number of elements in the list.
+ */
+static inline size_t list_length(struct list_head *head)
+{
+  struct list_head *it_pos;
+  size_t sz_counter = 0;
+
+  list_for_each(it_pos, head)
+  {
+    sz_counter++;
+  }
+
+  return sz_counter;
+}
+
+/**
+ * list_sort - sort a list
+ * @priv: private data, opaque to list_sort(), passed to @cmp
+ * @head: the list to sort
+ * @cmp: the elements comparison function
+ *
+ * This function implements "merge sort", which has O(nlog(n))
+ * complexity.
+ *
+ * The comparison function @cmp must return a negative value if @a
+ * should sort before @b, and a positive value if @a should sort after
+ * @b. If @a and @b are equivalent, and their original relative
+ * ordering is to be preserved, @cmp must return 0.
+ */
+void list_sort(void *priv,
+               struct list_head *head,
+               comparator_cb cb);
 
 #endif
