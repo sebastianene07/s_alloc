@@ -1,9 +1,9 @@
 OUT = allocator
-LIBRARY_CFLAGS := $(CFLAGS) -Wall -Werror 
+LIBRARY_CFLAGS := $(CFLAGS) -Wall -Werror
 TOPDIR ?= .
 TMP_LIB ?= lib_salloc.a 
 LIBRARY := $(TOPDIR)/$(TMP_LIB)
-SRC := s_heap.c 
+SRC := s_heap.c list.c
 TEST_SRC := main.c
 OBJS := $(patsubst %.c,%.o,$(SRC))
 

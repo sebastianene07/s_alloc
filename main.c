@@ -7,6 +7,12 @@
 
 #include "s_heap.h"
 
+#define TEST_HEAP_LENGTH_BYTES    (128 * 1024 * 1024)  
+#define TEST_ARRAY_SIZE           (200)
+#define RANDOM_ALLOCATION_SIZE    (8 * 1024)
+#define RANDOM_REALLOCATION_SIZE  (8 * 1024)
+
+
 void s_dbg_heap(heap_t *my_heap)
 {
   printf("\n################ Heap details ####################\n");
@@ -19,9 +25,11 @@ void s_dbg_heap(heap_t *my_heap)
   mem_node_t *node = NULL;
   list_for_each_entry (node, &my_heap->g_used_heap_list, node_list)
   {
+
     printf("leaked block start = 0x%lx, size = %u blocks\n",
            (unsigned long)node->chunk_addr,
            node->mask.size);
+    assert(0);
   }
 
   printf("################ Free blocks ##################\n");
@@ -38,15 +46,13 @@ void s_dbg_heap(heap_t *my_heap)
 int main(void)
 {
   static heap_t my_heap;
-  const size_t sz = 1024 * 1024;
-  const uint32_t TEST_ARRAY_SIZE = 200;
 
-  void *start_addr = malloc(sz);
+  void *start_addr = malloc(TEST_HEAP_LENGTH_BYTES);
   assert(start_addr);
 
   s_init(&my_heap,
          start_addr,
-         start_addr + sz);
+         start_addr + TEST_HEAP_LENGTH_BYTES);
 
   uint32_t *ptrs[TEST_ARRAY_SIZE];
   uint32_t size[TEST_ARRAY_SIZE];
@@ -61,7 +67,7 @@ int main(void)
 
 		for (int i = 0; i < TEST_ARRAY_SIZE; i++)
 		{
-			size_t sz = rand() % 100;
+			size_t sz = rand() % RANDOM_ALLOCATION_SIZE;
 			size[i] = sz;
 			ptrs[i] = s_alloc(sz, &my_heap);
 			if (ptrs[i] == NULL)
@@ -86,7 +92,7 @@ int main(void)
 
 			if (sz % 2 == 0)
 			{
-				size_t new_size = rand() % 100;
+				size_t new_size = rand() % RANDOM_REALLOCATION_SIZE;
 				size[i] = new_size;
 				ptrs[i] = s_realloc(ptrs[i], new_size, &my_heap);
 				if (ptrs[i] == NULL)
@@ -162,7 +168,7 @@ int main(void)
 		printf("\r\nIteration : %u\n", ++it);
 		printf("\r\n##############\r\n");
 		printf("\r\n##############\r\n");
-    sleep(1);
+//    sleep(1);
 	}
   free(start_addr);
   return 0;
